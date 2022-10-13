@@ -194,8 +194,11 @@ old_dang=0;
 
 old_err=Tgt_speed-norm(v);
 int_err=zeros(100);              % Integral over last 100 steps
+err_fun = [];
 
 %%%%%%%%%% ... AND THIS LINE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
 
 while(1)        %% Main simulation loop
 
@@ -206,6 +209,7 @@ while(1)        %% Main simulation loop
  x1=max(1,round(Xc-whs));
  x2=min(size(map_big,2),round(Xc+whs));
  map=map_big(y1:y2,x1:x2);
+
 
  figure(1);clf;imagesc(map);axis image;colormap(jet);title('Currently driving here');hold on;
 
@@ -238,18 +242,42 @@ while(1)        %% Main simulation loop
 
  %%%%%%%%%%%%%%%% DO NOT CHANGE ANY CODE ABOVE THIS LINE %%%%%%%%%%%%%%%%%%%%%
  
- %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%V%%%%%%%%
  % TO DO: Implement your PID computation below, your PID must update a
  % variable called U, you need to figure out how to compute error,
  % the derivative of error over time, and the integral of error over
  % time. You *CAN* add your own variables as needed.
  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ error = norm(Tgt_speed) - norm(v);
+ len = 15;
+ if (size(err_fun, 1) < len)
+   err_fun(end + 1, :) = error;
+ else
+   err_fun = err_fun(2:end);
+ endif
 
- U=0;       % Replace this with a computation based on your PID controller. You can
-            % add variables to this script as needed
+ % P control, Kp should be target / 50
+ P = error / 0.5;
+ U = Kp * error;
+ % D control
+ if (size(err_fun, 2) == len)
+   derivative = (err_fun(end) - err_fun(end-1));
+ else
+   derivative = 0
+ endif
+ % Kd got to be negative
+ U += Kd * derivative;
+ % I control
+ integral = sum(err_fun);
+ U += integral * Ki 
+ 
+ 
+ 
+          % Replace this with a computation based on your PID controller. You can
+                    % add variables to this script as needed
   
  % Please add in the line below the tuning settings that yield a good controller!
- % Kp=        , Ki=          , Kd=           
+ % Kp = Tgt_speed / 50, Ki= Tgt_speed / 5000   , Kd= -0.2           
  
   
  %%%%%%%%%%%%%%%%%%  DO NOT CHANGE ANY CODE BELOW THIS LINE %%%%%%%%%%%%%%%%%%%%%
@@ -261,7 +289,11 @@ while(1)        %% Main simulation loop
  % in the direction of motion.
  tdf=1-(1/(1+exp(-5*(norm(v)-25))));
  F=tdf*max_torque*cur_U/.065;
- 
+ diff = 10 - norm(Vs(end,:));
+ if (diff > 2)
+   F = diff * F / 0.5   
+ endif
+
  % The torque applies directly along the direction of motion (and because the location update ensures the rover
  % remains on the surface of the planet, it should be ok to just apply this along whatever motion direction
  % we obtained above without worrying the rover will float or go underground)
@@ -272,6 +304,7 @@ while(1)        %% Main simulation loop
  %
  % Update forces, acceleration, velocity, and position:
  totalF=(F*dr)+((Ext*dr')*dr);
+## fprintf("F: %.02f,      External:  %.02f\n", F*dr, ((Ext*dr')*dr));
  a=totalF/Rover_mass;
  v=v+a;
  Xc=x2;
